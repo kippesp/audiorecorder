@@ -1,0 +1,2 @@
+#define RA_VERSION "@RA_VERSION@"
+#define RA_COPYRIGHT "Copyright (c) 2026 Paul Kippes"

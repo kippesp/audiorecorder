@@ -1,0 +1,11 @@
+Checks: "-*,
+        bugprone-*,
+        -bugprone-sizeof-expression,
+        -bugprone-multi-level-implicit-pointer-conversion,
+        -bugprone-easily-swappable-parameters,
+        -bugprone-exception-escape
+"
+
+WarningsAsErrors: 'bugprone-not-null-terminated-result'
+HeaderFilterRegex: ''
+FormatStyle: 'none'
