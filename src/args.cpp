@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <getopt.h>
 
-static void printUsage(const char* a_prog)
+static void printUsage()
 {
   printErr(
       "Usage: {} [options]\n\n"
@@ -28,7 +28,7 @@ static void printUsage(const char* a_prog)
       "(buffer health, overruns)\n"
       "  -h, --help                Show this help\n"
       "  -V, --version             Show version and exit\n",
-      a_prog);
+      RA_PROGRAM_NAME);
 }
 
 Args parseArgs(int a_argc, char* a_argv[])
@@ -95,7 +95,7 @@ Args parseArgs(int a_argc, char* a_argv[])
         args.verbose_ = true;
         break;
       case 'h':
-        printUsage(a_argv[0]);
+        printUsage();
         exit(0);
       case 'V':
         printErr(
@@ -105,7 +105,7 @@ Args parseArgs(int a_argc, char* a_argv[])
             RA_VERSION);
         exit(0);
       default:
-        printUsage(a_argv[0]);
+        printUsage();
         exit(1);
     }
   }
