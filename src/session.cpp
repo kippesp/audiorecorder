@@ -7,25 +7,18 @@
 #include "monitor.h"
 #include "output_file.h"
 #include "recording_context.h"
+#include "signal_handler.h"
 #include "util.h"
 #include "writer.h"
 
 #include <IOKit/pwr_mgt/IOPMLib.h>
 
 #include <cmath>
-#include <csignal>
 #include <cstdio>
 #include <format>
 #include <functional>
 #include <sys/stat.h>
 #include <thread>
-
-static std::atomic<bool> s_stop_requested {false};
-
-static void signalHandler(int)
-{
-  s_stop_requested.store(true, std::memory_order_relaxed);
-}
 
 struct SleepGuard {
   IOPMAssertionID id_ = 0;
@@ -177,8 +170,8 @@ static std::optional<SessionState> setupSession(
 static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
                             const Args& a_args)
 {
-  signal(SIGINT, signalHandler);
-  signal(SIGTERM, signalHandler);
+  std::atomic<bool> stop_requested {false};
+  installSignalHandler(stop_requested);
   SleepGuard sleep_guard;
 
   if (a_args.test_)
@@ -266,7 +259,7 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
   };
 
   // Blocks until Ctrl-C, max duration, or write error.
-  runMeterLoop(pollDisplay, loop_config, s_stop_requested);
+  runMeterLoop(pollDisplay, loop_config, stop_requested);
 
   if (a_session.monitor_guard_)
     AudioOutputUnitStop(a_session.monitor_guard_.get());
