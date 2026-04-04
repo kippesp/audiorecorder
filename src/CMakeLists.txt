@@ -68,6 +68,7 @@ add_executable(ra
     recording_context.h
     writer.h
     signal_handler.h
+    sleep_guard.h
     session.h
     ring_buffer.h
     util.h
