@@ -124,6 +124,6 @@ public:
 private:
   std::vector<float> buf_;
   size_t mask_ = 0;
-  std::atomic<size_t> write_pos_ {0};
-  std::atomic<size_t> read_pos_ {0};
+  alignas(64) std::atomic<size_t> write_pos_ {0};
+  alignas(64) std::atomic<size_t> read_pos_ {0};
 };
