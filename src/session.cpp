@@ -49,6 +49,9 @@ struct SleepGuard {
 };
 
 struct Session {
+  // Declaration order is load-bearing: unit_guard_ must be destroyed before
+  // file_guard_ so that no callbacks fire after the writer has drained and
+  // the file has been closed.
   AudioUnitGuard unit_guard_;  // RAII owner of the capture AudioUnit
   AudioFileGuard file_guard_;  // RAII owner of the output ExtAudioFile
   AudioDevice device_;
