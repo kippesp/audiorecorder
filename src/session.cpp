@@ -8,10 +8,9 @@
 #include "output_file.h"
 #include "recording_context.h"
 #include "signal_handler.h"
+#include "sleep_guard.h"
 #include "util.h"
 #include "writer.h"
-
-#include <IOKit/pwr_mgt/IOPMLib.h>
 
 #include <cmath>
 #include <cstdio>
@@ -19,27 +18,6 @@
 #include <functional>
 #include <sys/stat.h>
 #include <thread>
-
-struct SleepGuard {
-  IOPMAssertionID id_ = 0;
-
-  SleepGuard()
-  {
-    IOReturn ret = IOPMAssertionCreateWithName(
-        kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionLevelOn,
-        CFSTR("Audio recording in progress"), &id_);
-    if (ret != kIOReturnSuccess)
-      printErr("Warning: could not prevent idle sleep.\n");
-  }
-  ~SleepGuard()
-  {
-    if (id_)
-      IOPMAssertionRelease(id_);
-  }
-
-  SleepGuard(const SleepGuard&) = delete;
-  SleepGuard& operator=(const SleepGuard&) = delete;
-};
 
 struct Session {
   // Declaration order is load-bearing: unit_guard_ must be destroyed before
