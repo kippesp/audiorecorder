@@ -32,7 +32,7 @@ beyond macOS system frameworks.  The design centers on these features:
 - **Format:** CAF (Core Audio Format)
 - **Sample rate:** Matches the input device (typically 44100 or 48000 Hz)
 - **Bit depth:** 24-bit signed integer, packed
-- **Channels:** Stereo or mono depending on device and `--mono` flag
+- **Channels:** Stereo or mono depending on device
 
 ## Usage
 
@@ -42,7 +42,6 @@ ra [options]
   -o, --output <path>       Output file path (default: ./Recording_YYYYMMDDTHHMMSS.caf)
   -d, --device <#|name|uid> Input device by number, name, or UID (default: system default)
   -l, --list-devices        List available input devices and exit
-  -m, --mono                Mix to mono (default: use device channel count)
   -M, --monitor             Play input through default output device
   -t, --test                Test mode: capture audio without writing a file
   -D, --max-duration <min>  Stop after N minutes (default: unlimited)
@@ -60,10 +59,10 @@ List input devices:
 ra -l
 ```
 
-Record from device 2 in mono, stop after 60 minutes:
+Record from device 2, stop after 60 minutes:
 
 ```
-ra -d 2 -m -D 60 -o recording.caf
+ra -d 2 -D 60 -o recording.caf
 ```
 
 Record from the default device with no time limit:
@@ -89,7 +88,7 @@ src/
   capture.h/cpp       CoreAudio input unit setup and callback
   monitor.h/cpp       CoreAudio output unit for input monitoring
   output_file.h/cpp   CAF file creation
-  writer.h/cpp        Writer thread: ring drain, mixdown, file write
+  writer.h/cpp        Writer thread: ring drain, file write
   display.h/cpp       Level meter rendering and display loop
   recording_context.h Shared recording state and RAII resource guards
   device.h/cpp        Audio device enumeration and selection

@@ -55,7 +55,6 @@ struct Session {
   std::string output_path_;
   std::string output_dir_;
   uint32_t record_channels_ = 0;
-  uint32_t output_channels_ = 0;
   const char* ch_label_ = "";
   AudioUnitGuard monitor_guard_;
 
@@ -82,8 +81,7 @@ static std::optional<SessionState> setupSession(
   auto device = std::move(*device_result);
 
   uint32_t record_channels = std::min(device.input_channels_, 2u);
-  uint32_t output_channels = a_args.mono_ ? 1 : record_channels;
-  auto ch_label = output_channels == 1 ? "mono" : "stereo";
+  auto ch_label = record_channels == 1 ? "mono" : "stereo";
 
   std::string output_path;
   std::string output_dir;
@@ -101,7 +99,7 @@ static std::optional<SessionState> setupSession(
 
     output_dir = directoryOf(output_path);
     uint64_t bytes_per_sec =
-        static_cast<uint64_t>(device.sample_rate_) * output_channels * 3;
+        static_cast<uint64_t>(device.sample_rate_) * record_channels * 3;
 
     auto disk_result = checkDiskSpace(output_dir, bytes_per_sec,
                                       a_args.max_duration_min_, ch_label);
@@ -112,7 +110,7 @@ static std::optional<SessionState> setupSession(
     }
 
     auto file_result =
-        createOutputFile(output_path, device.sample_rate_, output_channels);
+        createOutputFile(output_path, device.sample_rate_, record_channels);
     if (!file_result)
     {
       printErr("Error: failed to create output file ({}).\n",
@@ -153,7 +151,6 @@ static std::optional<SessionState> setupSession(
       std::move(output_path),
       std::move(output_dir),
       record_channels,
-      output_channels,
       ch_label,
       std::move(monitor_guard),
       0,
@@ -204,8 +201,7 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
     printErr("  Monitor: on\n");
   printErr("Press Ctrl-C to stop.\n\n");
 
-  std::jthread writer_thread(writerFn, &a_ctx, a_session.file_guard_.get(),
-                             a_session.output_channels_);
+  std::jthread writer_thread(writerFn, &a_ctx, a_session.file_guard_.get());
 
   OSStatus start_status = AudioOutputUnitStart(a_ctx.audio_unit_);
   if (start_status != noErr)
