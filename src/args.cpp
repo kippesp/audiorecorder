@@ -16,8 +16,6 @@ static void printUsage()
       "  -d, --device <#|name|uid> Input device by number, name, or UID "
       "(default: system default)\n"
       "  -l, --list-devices        List available input devices and exit\n"
-      "  -m, --mono                Mix to mono "
-      "(default: use device channel count)\n"
       "  -M, --monitor             Play input through default output device\n"
       "  -t, --test                Test mode: capture audio without "
       "writing a file\n"
@@ -39,7 +37,6 @@ Args parseArgs(int a_argc, char* a_argv[])
       {"output", required_argument, nullptr, 'o'},
       {"device", required_argument, nullptr, 'd'},
       {"list-devices", no_argument, nullptr, 'l'},
-      {"mono", no_argument, nullptr, 'm'},
       {"monitor", no_argument, nullptr, 'M'},
       {"test", no_argument, nullptr, 't'},
       {"max-duration", required_argument, nullptr, 'D'},
@@ -50,7 +47,7 @@ Args parseArgs(int a_argc, char* a_argv[])
       {nullptr, 0, nullptr, 0}};
 
   int opt;
-  while ((opt = getopt_long(a_argc, a_argv, "o:d:D:lmMtqvhV", long_options,
+  while ((opt = getopt_long(a_argc, a_argv, "o:d:D:lMtqvhV", long_options,
                             nullptr)) != -1)
   {
     switch (opt)
@@ -63,9 +60,6 @@ Args parseArgs(int a_argc, char* a_argv[])
         break;
       case 'l':
         args.list_devices_ = true;
-        break;
-      case 'm':
-        args.mono_ = true;
         break;
       case 'M':
         args.monitor_ = true;

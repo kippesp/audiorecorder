@@ -8,7 +8,6 @@ struct Args {
   std::string output_path_;
   std::string device_selector_;
   bool list_devices_ = false;
-  bool mono_ = false;
   bool monitor_ = false;
   bool test_ = false;
   int max_duration_min_ = 0;

@@ -1,4 +1,4 @@
-// writer.h -- Writer thread (ring drain, mixdown, file write).
+// writer.h -- Writer thread (ring drain, file write).
 
 #pragma once
 
@@ -9,4 +9,4 @@
 // Writer thread entry point (for std::jthread).
 // On write failure, sets ctx.write_error_ and returns.
 void writerFn(std::stop_token a_stoken, RecordingContext* a_ctx,
-              ExtAudioFileRef a_audio_file, uint32_t a_output_channels);
+              ExtAudioFileRef a_audio_file);
