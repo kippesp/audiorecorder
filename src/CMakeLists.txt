@@ -52,6 +52,7 @@ add_executable(ra
     device.cpp
     monitor.cpp
     output_file.cpp
+    signal_handler.cpp
     session.cpp
     writer.cpp
     display.cpp
@@ -66,6 +67,7 @@ add_executable(ra
     output_file.h
     recording_context.h
     writer.h
+    signal_handler.h
     session.h
     ring_buffer.h
     util.h
