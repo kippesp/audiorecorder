@@ -43,9 +43,26 @@ void PeakProcessor::updateLevels(float a_peak_l, float a_peak_r,
 
 static std::string renderMeter(int a_width, float a_db, float a_hold_db)
 {
-  int fill_width = std::clamp(
-      static_cast<int>((a_db + 60.0f) / 60.0f * static_cast<float>(a_width)), 0,
-      a_width);
+  // Left block elements for fractional fill (1/8 to 7/8).
+  // Index 0 unused; indices 1..7 map to U+258F..U+2589.
+  static constexpr const char* k_frac_blocks[] = {
+      "",              // 0/8 -- no fractional cell
+      "\xe2\x96\x8f",  // 1/8  U+258F left one-eighth block
+      "\xe2\x96\x8e",  // 2/8  U+258E left one-quarter block
+      "\xe2\x96\x8d",  // 3/8  U+258D left three-eighths block
+      "\xe2\x96\x8c",  // 4/8  U+258C left half block
+      "\xe2\x96\x8b",  // 5/8  U+258B left five-eighths block
+      "\xe2\x96\x8a",  // 6/8  U+258A left three-quarters block
+      "\xe2\x96\x89",  // 7/8  U+2589 left seven-eighths block
+  };
+
+  float fill_pos =
+      std::clamp((a_db + 60.0f) / 60.0f * static_cast<float>(a_width), 0.0f,
+                 static_cast<float>(a_width));
+  int full_blocks = static_cast<int>(fill_pos);
+  int frac_index =
+      static_cast<int>((fill_pos - static_cast<float>(full_blocks)) * 8.0f);
+
   int hold_indicator_pos =
       std::clamp(static_cast<int>((a_hold_db + 60.0f) / 60.0f *
                                   static_cast<float>(a_width)),
@@ -55,9 +72,11 @@ static std::string renderMeter(int a_width, float a_db, float a_hold_db)
   meter_str.reserve(static_cast<size_t>(a_width) * 3);
   for (int i = 0; i < a_width; i++)
   {
-    if (i < fill_width)
+    if (i < full_blocks)
       meter_str += "\xe2\x96\x88";  // full block
-    else if (i == hold_indicator_pos && hold_indicator_pos >= fill_width)
+    else if (i == full_blocks && frac_index > 0)
+      meter_str += k_frac_blocks[frac_index];
+    else if (i == hold_indicator_pos && hold_indicator_pos >= full_blocks)
       meter_str += "\xe2\x94\x82";  // vertical line
     else
       meter_str += "\xe2\x96\x91";  // light shade
