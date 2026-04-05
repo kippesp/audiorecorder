@@ -84,17 +84,19 @@ and writes to disk through `ExtAudioFileWrite`.
 src/
   main.cpp            Entry point -- parses args, dispatches to session
   args.h/cpp          CLI argument parsing and usage display
-  session.h/cpp       Session lifecycle: setup, recording loop, summary
-  capture.h/cpp       CoreAudio input unit setup and callback
-  monitor.h/cpp       CoreAudio output unit for input monitoring
-  output_file.h/cpp   CAF file creation
-  writer.h/cpp        Writer thread: ring drain, file write
-  display.h/cpp       Level meter rendering and display loop
-  recording_context.h Shared recording state and RAII resource guards
-  device.h/cpp        Audio device enumeration and selection
-  file_util.h/cpp     Path resolution and disk space utilities
-  ring_buffer.h       Lock-free SPSC ring buffer
-  util.h              Formatted stderr output
+  session.h/cpp         Session lifecycle: setup, recording loop, summary
+  capture.h/cpp         CoreAudio input unit setup and callback
+  monitor.h/cpp         CoreAudio output unit for input monitoring
+  output_file.h/cpp     CAF file creation
+  writer.h/cpp          Writer thread: ring drain, file write
+  display.h/cpp         Level meter rendering and display loop
+  signal_handler.h/cpp  Signal registration for graceful shutdown
+  sleep_guard.h         RAII guard to prevent idle sleep during recording
+  recording_context.h   Shared recording state and RAII resource guards
+  device.h/cpp          Audio device enumeration and selection
+  file_util.h/cpp       Path resolution and disk space utilities
+  ring_buffer.h         Lock-free SPSC ring buffer
+  util.h                Formatted stderr output
 ```
 
 ## Building
