@@ -15,6 +15,11 @@ static void handler(int)
 void installSignalHandler(std::atomic<bool>& a_stop_flag)
 {
   s_stop_flag = &a_stop_flag;
-  signal(SIGINT, handler);
-  signal(SIGTERM, handler);
+
+  struct sigaction sa {};
+  sigemptyset(&sa.sa_mask);
+  sa.sa_handler = handler;
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, nullptr);
+  sigaction(SIGTERM, &sa, nullptr);
 }

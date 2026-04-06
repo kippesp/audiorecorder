@@ -14,11 +14,14 @@ public:
         kIOPMAssertionTypePreventUserIdleSystemSleep, kIOPMAssertionLevelOn,
         CFSTR("Audio recording in progress"), &id_);
     if (ret != kIOReturnSuccess)
+    {
       printErr("Warning: could not prevent idle sleep.\n");
+      id_ = kIOPMNullAssertionID;
+    }
   }
   ~SleepGuard()
   {
-    if (id_)
+    if (id_ != kIOPMNullAssertionID)
       IOPMAssertionRelease(id_);
   }
 
@@ -26,5 +29,5 @@ public:
   SleepGuard& operator=(const SleepGuard&) = delete;
 
 private:
-  IOPMAssertionID id_ = 0;
+  IOPMAssertionID id_ = kIOPMNullAssertionID;
 };
