@@ -175,6 +175,9 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
     printErr("  Monitor: on\n");
   printErr("Press Ctrl-C to stop.\n\n");
 
+  // writer_thread must be joined before this function returns: the writer
+  // holds a raw ExtAudioFileRef from a_session.file_guard_, which is
+  // destroyed when the caller's SessionState goes out of scope.
   std::jthread writer_thread(writerFn, &a_ctx, a_session.file_guard_.get());
 
   OSStatus start_status = AudioOutputUnitStart(a_ctx.audio_unit_);
