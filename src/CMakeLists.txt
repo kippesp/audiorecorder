@@ -22,7 +22,7 @@ if(ENABLE_CLANG_TIDY)
   endif()
 endif()
 
-set(RA_VERSION "1.1")
+set(RA_VERSION "1.2")
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/config.h.in
