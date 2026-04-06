@@ -38,7 +38,7 @@ std::string directoryOf(const std::string& a_path)
   return parent.empty() ? "." : parent.string();
 }
 
-static std::string defaultOutputPath()
+std::string defaultOutputPath()
 {
   auto now = std::chrono::system_clock::now();
   auto tt = std::chrono::system_clock::to_time_t(now);
@@ -52,18 +52,10 @@ static std::string defaultOutputPath()
 std::expected<std::string, std::string> resolveOutputPath(
     const std::string& a_user_path)
 {
-  std::string path;
-  if (a_user_path.empty())
-  {
-    path = defaultOutputPath();
-  }
-  else
-  {
-    auto result = expandHome(a_user_path);
-    if (!result)
-      return std::unexpected(std::move(result.error()));
-    path = std::move(*result);
-  }
+  auto result = expandHome(a_user_path);
+  if (!result)
+    return std::unexpected(std::move(result.error()));
+  std::string path = std::move(*result);
 
   if (!path.ends_with(".caf"))
     path += ".caf";

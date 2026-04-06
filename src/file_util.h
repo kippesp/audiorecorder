@@ -8,6 +8,7 @@
 
 uint64_t getFreeBytes(const std::string& a_path);
 
+std::string defaultOutputPath();
 std::expected<std::string, std::string> resolveOutputPath(
     const std::string& a_user_path);
 std::string directoryOf(const std::string& a_path);

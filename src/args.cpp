@@ -104,5 +104,11 @@ Args parseArgs(int a_argc, char* a_argv[])
     }
   }
 
+  if (args.quiet_ && args.verbose_)
+  {
+    printErr("Error: --quiet and --verbose are mutually exclusive.\n");
+    exit(1);
+  }
+
   return args;
 }
