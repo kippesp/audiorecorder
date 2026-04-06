@@ -63,7 +63,8 @@ static std::optional<SessionState> setupSession(
 
   if (!a_args.test_)
   {
-    auto path_result = resolveOutputPath(a_args.output_path_);
+    auto path_result =
+        resolveOutputPath(a_args.output_path_.value_or(defaultOutputPath()));
     if (!path_result)
     {
       printErr(path_result.error());
@@ -75,8 +76,9 @@ static std::optional<SessionState> setupSession(
     uint64_t bytes_per_sec =
         static_cast<uint64_t>(device.sample_rate_) * record_channels * 3;
 
-    auto disk_result = checkDiskSpace(output_dir, bytes_per_sec,
-                                      a_args.max_duration_min_, ch_label);
+    auto disk_result =
+        checkDiskSpace(output_dir, bytes_per_sec,
+                       a_args.max_duration_min_.value_or(0), ch_label);
     if (!disk_result)
     {
       printErr(disk_result.error());
@@ -168,9 +170,9 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
     printErr("Recording to {}\n", a_session.output_path_);
   printErr("  Device: {} ({:.0f} Hz, {}, 24-bit)\n", a_session.device_.name_,
            a_session.device_.sample_rate_, a_session.ch_label_);
-  if (a_args.max_duration_min_ > 0)
+  if (a_args.max_duration_min_)
     printErr("  Max duration: {:02d}:{:02d}:00\n",
-             a_args.max_duration_min_ / 60, a_args.max_duration_min_ % 60);
+             *a_args.max_duration_min_ / 60, *a_args.max_duration_min_ % 60);
   if (a_session.monitor_guard_)
     printErr("  Monitor: on\n");
   printErr("Press Ctrl-C to stop.\n\n");
@@ -235,7 +237,7 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
 
   DisplayLoopConfig loop_config {
       .quiet = a_args.quiet_,
-      .max_duration_min = a_args.max_duration_min_,
+      .max_duration_min = a_args.max_duration_min_.value_or(0),
       .record_channels = a_session.record_channels_,
   };
 
