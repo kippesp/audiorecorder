@@ -22,6 +22,8 @@ if(ENABLE_CLANG_TIDY)
   endif()
 endif()
 
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
 set(RA_VERSION "1.2")
 
 configure_file(
@@ -75,6 +77,9 @@ add_executable(ra
 )
 
 target_include_directories(ra PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+include(GitVersion)
+add_git_version_tracking(ra)
 
 target_link_libraries(ra PRIVATE
     "-framework CoreAudio"
