@@ -23,6 +23,7 @@ void PeakProcessor::updateLevels(float a_peak_l, float a_peak_r,
   else if (std::chrono::duration<double>(a_now - hold_time_l_).count() > 1.5)
   {
     hold_l_ = a_peak_l;
+    hold_time_l_ = a_now;
   }
   if (a_peak_r >= hold_r_)
   {
@@ -32,6 +33,7 @@ void PeakProcessor::updateLevels(float a_peak_l, float a_peak_r,
   else if (std::chrono::duration<double>(a_now - hold_time_r_).count() > 1.5)
   {
     hold_r_ = a_peak_r;
+    hold_time_r_ = a_now;
   }
 
   // Convert to dB
@@ -92,15 +94,15 @@ std::string formatMeterLine(const MeterState& a_state)
   {
     line += std::format(" [{}] {:+6.1f}dB",
                         renderMeter(27, a_state.peak_db_l_, a_state.hold_db_l_),
-                        a_state.peak_db_l_);
+                        a_state.hold_db_l_);
   }
   else
   {
-    float db_max = std::max(a_state.peak_db_l_, a_state.peak_db_r_);
+    float hold_max = std::max(a_state.hold_db_l_, a_state.hold_db_r_);
     line += std::format(" L[{}] R[{}] {:+6.1f}dB",
                         renderMeter(25, a_state.peak_db_l_, a_state.hold_db_l_),
                         renderMeter(25, a_state.peak_db_r_, a_state.hold_db_r_),
-                        db_max);
+                        hold_max);
   }
 
   if (a_state.clipping_)
