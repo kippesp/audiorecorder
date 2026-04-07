@@ -2,6 +2,7 @@
 
 #include "args.h"
 #include "config.h"
+#include "git_version.h"
 #include "util.h"
 
 #include <cstdlib>
@@ -93,7 +94,7 @@ Args parseArgs(int a_argc, char* a_argv[])
         exit(0);
       case 'V':
         printErr(
-            "ra - macOS Audio Recorder - v{}\n"
+            "ra - macOS Audio Recorder - v{}" RA_GIT_HASH_DISPLAY "\n"
             "  Records 24-bit audio to CAF files\n"
             "  " RA_COPYRIGHT "\n",
             RA_VERSION);
