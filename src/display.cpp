@@ -105,9 +105,6 @@ std::string formatMeterLine(const MeterState& a_state)
                         hold_max);
   }
 
-  if (a_state.clipping_)
-    line += " CLIP";
-
   int elapsed_hr = a_state.elapsed_sec_ / 3600;
   int elapsed_min = (a_state.elapsed_sec_ % 3600) / 60;
   int elapsed_sec = a_state.elapsed_sec_ % 60;
@@ -138,6 +135,9 @@ std::string formatMeterLine(const MeterState& a_state)
       line += std::format(" ovr:{}", *a_state.overruns_);
   }
 
+  if (a_state.clipping_)
+    line += " CLIP";
+
   return line;
 }
 
@@ -147,6 +147,7 @@ void runMeterLoop(std::function<DisplaySample()> a_poll,
 {
   auto start_time = std::chrono::steady_clock::now();
   PeakProcessor peaks;
+  int clip_hold = 0;
 
   constexpr int k_poll_ms = 100;
 
@@ -174,9 +175,14 @@ void runMeterLoop(std::function<DisplaySample()> a_poll,
       state.peak_db_r_ = peaks.db_r_;
       state.hold_db_l_ = peaks.hold_db_l_;
       state.hold_db_r_ = peaks.hold_db_r_;
-      state.clipping_ =
+      bool clipped_now =
           sample.peak_l_ >= 1.0f ||
           (a_config.record_channels == 2 && sample.peak_r_ >= 1.0f);
+      if (clipped_now)
+        clip_hold = 5;
+      state.clipping_ = clip_hold > 0;
+      if (clip_hold > 0)
+        --clip_hold;
       state.elapsed_sec_ = static_cast<int>(elapsed);
       state.total_sec_ =
           a_config.max_duration_min > 0 ? a_config.max_duration_min * 60 : 0;
