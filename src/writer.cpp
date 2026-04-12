@@ -41,8 +41,8 @@ void writerFn(std::stop_token a_stoken, RecordingContext* a_ctx,
         ExtAudioFileWrite(a_audio_file, static_cast<UInt32>(frame_count), &abl);
     if (write_status != noErr)
     {
-      printErr("\nError: disk write failed (OSStatus {}).\n",
-               static_cast<int>(write_status));
+      printErr("\nError: disk write failed ({}).\n",
+               formatOSStatus(write_status));
       a_ctx->write_error_.store(true, std::memory_order_relaxed);
       return;
     }

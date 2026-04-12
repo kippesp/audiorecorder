@@ -90,7 +90,7 @@ static std::optional<SessionState> setupSession(
     if (!file_result)
     {
       printErr("Error: failed to create output file ({}).\n",
-               file_result.error());
+               formatOSStatus(file_result.error()));
       return std::nullopt;
     }
     file_guard = std::move(*file_result);
@@ -102,7 +102,8 @@ static std::optional<SessionState> setupSession(
       setupCaptureUnit(*ctx, device.id_, device.sample_rate_, record_channels);
   if (!unit_result)
   {
-    printErr("Error: failed to set up audio unit ({}).\n", unit_result.error());
+    printErr("Error: failed to set up audio unit ({}).\n",
+             formatOSStatus(unit_result.error()));
     return std::nullopt;
   }
 
@@ -114,7 +115,7 @@ static std::optional<SessionState> setupSession(
     if (!monitor_result)
     {
       printErr("Error: failed to set up monitor output ({}).\n",
-               monitor_result.error());
+               formatOSStatus(monitor_result.error()));
       return std::nullopt;
     }
     monitor_guard = AudioUnitGuard(*monitor_result);
@@ -186,7 +187,7 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
   if (start_status != noErr)
   {
     printErr("Error: failed to start audio unit ({}).\n",
-             static_cast<int>(start_status));
+             formatOSStatus(start_status));
     return 1;
   }
 
