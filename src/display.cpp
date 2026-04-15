@@ -90,29 +90,29 @@ std::string formatMeterLine(const MeterState& a_state)
 {
   std::string line = "\r\033[K";
 
-  if (a_state.channels_ == 1)
+  if (a_state.channels == 1)
   {
     line += std::format(" [{}] {:+6.1f}dB",
-                        renderMeter(27, a_state.peak_db_l_, a_state.hold_db_l_),
-                        a_state.hold_db_l_);
+                        renderMeter(27, a_state.peak_db_l, a_state.hold_db_l),
+                        a_state.hold_db_l);
   }
   else
   {
-    float hold_max = std::max(a_state.hold_db_l_, a_state.hold_db_r_);
+    float hold_max = std::max(a_state.hold_db_l, a_state.hold_db_r);
     line += std::format(" L[{}] R[{}] {:+6.1f}dB",
-                        renderMeter(25, a_state.peak_db_l_, a_state.hold_db_l_),
-                        renderMeter(25, a_state.peak_db_r_, a_state.hold_db_r_),
+                        renderMeter(25, a_state.peak_db_l, a_state.hold_db_l),
+                        renderMeter(25, a_state.peak_db_r, a_state.hold_db_r),
                         hold_max);
   }
 
-  int elapsed_hr = a_state.elapsed_sec_ / 3600;
-  int elapsed_min = (a_state.elapsed_sec_ % 3600) / 60;
-  int elapsed_sec = a_state.elapsed_sec_ % 60;
+  int elapsed_hr = a_state.elapsed_sec / 3600;
+  int elapsed_min = (a_state.elapsed_sec % 3600) / 60;
+  int elapsed_sec = a_state.elapsed_sec % 60;
 
-  if (a_state.total_sec_ > 0)
+  if (a_state.total_sec > 0)
   {
-    int total_hr = a_state.total_sec_ / 3600;
-    int total_min = (a_state.total_sec_ % 3600) / 60;
+    int total_hr = a_state.total_sec / 3600;
+    int total_min = (a_state.total_sec % 3600) / 60;
     line += std::format("  {:02d}:{:02d}:{:02d}/{:02d}:{:02d}:00", elapsed_hr,
                         elapsed_min, elapsed_sec, total_hr, total_min);
   }
@@ -122,20 +122,20 @@ std::string formatMeterLine(const MeterState& a_state)
                         elapsed_min, elapsed_sec);
   }
 
-  if (a_state.free_bytes_)
+  if (a_state.free_bytes)
   {
     line += std::format("  {:.0f}GB",
-                        static_cast<double>(*a_state.free_bytes_) / 1e9);
+                        static_cast<double>(*a_state.free_bytes) / 1e9);
   }
 
-  if (a_state.buffer_pct_)
+  if (a_state.buffer_pct)
   {
-    line += std::format("  buf:{:.1f}%", *a_state.buffer_pct_);
-    if (a_state.overruns_ && *a_state.overruns_ > 0)
-      line += std::format(" ovr:{}", *a_state.overruns_);
+    line += std::format("  buf:{:.1f}%", *a_state.buffer_pct);
+    if (a_state.overruns && *a_state.overruns > 0)
+      line += std::format(" ovr:{}", *a_state.overruns);
   }
 
-  if (a_state.clipping_)
+  if (a_state.clipping)
     line += " CLIP";
 
   return line;
@@ -163,33 +163,33 @@ void runMeterLoop(std::function<DisplaySample()> a_poll,
     }
 
     auto sample = a_poll();
-    if (sample.error_)
+    if (sample.error)
       break;
 
     if (!a_config.quiet)
     {
-      peaks.updateLevels(sample.peak_l_, sample.peak_r_, now);
+      peaks.updateLevels(sample.peak_l, sample.peak_r, now);
 
       MeterState state {};
-      state.peak_db_l_ = peaks.db_l_;
-      state.peak_db_r_ = peaks.db_r_;
-      state.hold_db_l_ = peaks.hold_db_l_;
-      state.hold_db_r_ = peaks.hold_db_r_;
+      state.peak_db_l = peaks.dbL();
+      state.peak_db_r = peaks.dbR();
+      state.hold_db_l = peaks.holdDbL();
+      state.hold_db_r = peaks.holdDbR();
       bool clipped_now =
-          sample.peak_l_ >= 1.0f ||
-          (a_config.record_channels == 2 && sample.peak_r_ >= 1.0f);
+          sample.peak_l >= 1.0f ||
+          (a_config.record_channels == 2 && sample.peak_r >= 1.0f);
       if (clipped_now)
         clip_hold = 5;
-      state.clipping_ = clip_hold > 0;
+      state.clipping = clip_hold > 0;
       if (clip_hold > 0)
         --clip_hold;
-      state.elapsed_sec_ = static_cast<int>(elapsed);
-      state.total_sec_ =
+      state.elapsed_sec = static_cast<int>(elapsed);
+      state.total_sec =
           a_config.max_duration_min > 0 ? a_config.max_duration_min * 60 : 0;
-      state.free_bytes_ = sample.free_bytes_;
-      state.channels_ = a_config.record_channels;
-      state.buffer_pct_ = sample.buffer_pct_;
-      state.overruns_ = sample.overruns_;
+      state.free_bytes = sample.free_bytes;
+      state.channels = a_config.record_channels;
+      state.buffer_pct = sample.buffer_pct;
+      state.overruns = sample.overruns;
 
       printErr(formatMeterLine(state));
     }

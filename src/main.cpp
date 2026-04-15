@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
   auto args = parseArgs(argc, argv);
   auto input_devices = getInputDevices();
 
-  if (args.list_devices_)
+  if (args.list_devices)
   {
     printDeviceList(input_devices);
     return input_devices.empty() ? 1 : 0;

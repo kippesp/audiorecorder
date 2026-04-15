@@ -7,6 +7,6 @@
 #include <stop_token>
 
 // Writer thread entry point (for std::jthread).
-// On write failure, sets ctx.write_error_ and returns.
+// On write failure, sets ctx.write_error and returns.
 void writerFn(std::stop_token a_stoken, RecordingContext* a_ctx,
               ExtAudioFileRef a_audio_file);

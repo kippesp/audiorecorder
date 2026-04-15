@@ -83,8 +83,8 @@ std::vector<AudioDevice> getInputDevices()
       continue;
 
     AudioDevice dev {};
-    dev.id_ = dev_id;
-    dev.input_channels_ = in_ch;
+    dev.id = dev_id;
+    dev.input_channels = in_ch;
 
     // Name
     CFStringRef cf_name = nullptr;
@@ -95,7 +95,7 @@ std::vector<AudioDevice> getInputDevices()
                                    &cf_name) == noErr &&
         cf_name)
     {
-      dev.name_ = cfToString(cf_name);
+      dev.name = cfToString(cf_name);
       CFRelease(cf_name);
     }
 
@@ -108,18 +108,18 @@ std::vector<AudioDevice> getInputDevices()
             noErr &&
         cf_uid)
     {
-      dev.uid_ = cfToString(cf_uid);
+      dev.uid = cfToString(cf_uid);
       CFRelease(cf_uid);
     }
 
     // Sample rate
     prop = {kAudioDevicePropertyNominalSampleRate,
             kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
-    size = sizeof(dev.sample_rate_);
+    size = sizeof(dev.sample_rate);
     if (AudioObjectGetPropertyData(dev_id, &prop, 0, nullptr, &size,
-                                   &dev.sample_rate_) != noErr)
+                                   &dev.sample_rate) != noErr)
       printErr("Warning: could not query sample rate for device '{}'.\n",
-               dev.name_);
+               dev.name);
 
     result.push_back(std::move(dev));
   }
@@ -137,8 +137,8 @@ void printDeviceList(const std::vector<AudioDevice>& a_devices)
   for (size_t i = 0; i < a_devices.size(); i++)
   {
     auto& d = a_devices[i];
-    printErr("  {}) {:<35s}  UID: {:<30s}  {:.0f} Hz  {} ch\n", i + 1, d.name_,
-             d.uid_, d.sample_rate_, d.input_channels_);
+    printErr("  {}) {:<35s}  UID: {:<30s}  {:.0f} Hz  {} ch\n", i + 1, d.name,
+             d.uid, d.sample_rate, d.input_channels);
   }
 }
 
@@ -155,13 +155,13 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
           std::string("Error: no default input device found.\n"));
     for (auto& d : a_devices)
     {
-      if (d.id_ == default_id)
+      if (d.id == default_id)
       {
         device = d;
         break;
       }
     }
-    if (device.id_ == kAudioObjectUnknown)
+    if (device.id == kAudioObjectUnknown)
       return std::unexpected(
           std::string("Error: default input device not available.\n"));
   }
@@ -176,11 +176,11 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       device = a_devices[static_cast<size_t>(idx - 1)];
     }
     // Then match UID
-    if (device.id_ == kAudioObjectUnknown)
+    if (device.id == kAudioObjectUnknown)
     {
       for (auto& d : a_devices)
       {
-        if (d.uid_ == a_selector)
+        if (d.uid == a_selector)
         {
           device = d;
           break;
@@ -188,18 +188,18 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       }
     }
     // Then match name
-    if (device.id_ == kAudioObjectUnknown)
+    if (device.id == kAudioObjectUnknown)
     {
       for (auto& d : a_devices)
       {
-        if (d.name_ == a_selector)
+        if (d.name == a_selector)
         {
           device = d;
           break;
         }
       }
     }
-    if (device.id_ == kAudioObjectUnknown)
+    if (device.id == kAudioObjectUnknown)
     {
       return std::unexpected(
           std::format("Error: no input device matches '{}'.\n"

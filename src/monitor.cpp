@@ -7,7 +7,7 @@
 #include <cstring>
 
 // Called by CoreAudio's output unit on its real-time thread when it needs
-// samples to play.  Pops from monitor_ring_ (fed by inputCallback) and
+// samples to play.  Pops from monitor_ring (fed by inputCallback) and
 // zero-fills any shortfall to avoid outputting garbage on underrun.
 static OSStatus monitorCallback(void* a_ref_con,
                                 AudioUnitRenderActionFlags* /*a_action_flags*/,
@@ -16,11 +16,11 @@ static OSStatus monitorCallback(void* a_ref_con,
                                 AudioBufferList* a_buf_list)
 {
   auto* ctx = static_cast<RecordingContext*>(a_ref_con);
-  uint32_t ch = ctx->monitor_channels_;
+  uint32_t ch = ctx->monitor_channels;
   size_t requested = static_cast<size_t>(a_number_frames) * ch;
   auto* out = static_cast<float*>(a_buf_list->mBuffers[0].mData);
 
-  size_t got = ctx->monitor_ring_.pop({out, requested});
+  size_t got = ctx->monitor_ring.pop({out, requested});
 
   // Fill remainder with silence on underrun
   if (got < requested)
@@ -31,18 +31,18 @@ static OSStatus monitorCallback(void* a_ref_con,
 
 // Configures a CoreAudio default-output unit to play captured audio through
 // the speakers/headphones (--monitor flag). Only called when monitoring is
-// requested; otherwise no output unit exists and monitor_ring_ stays unused.
+// requested; otherwise no output unit exists and monitor_ring stays unused.
 // The setup is boilerplate required by CoreAudio: find the output component,
 // set the stream format to match the capture device, register monitorCallback
 // as the sample source, and initialize.
 std::expected<AudioComponentInstance, OSStatus> setupMonitorUnit(
     RecordingContext& a_ctx, Float64 a_sample_rate, uint32_t a_channels)
 {
-  a_ctx.monitor_channels_ = a_channels;
+  a_ctx.monitor_channels = a_channels;
 
   // ~0.5 seconds of buffer -- enough to bridge input/output callback timing
   size_t ring_samples = static_cast<size_t>(a_sample_rate * 0.5) * a_channels;
-  a_ctx.monitor_ring_.init(ring_samples);
+  a_ctx.monitor_ring.init(ring_samples);
 
   AudioComponentDescription desc = {};
   desc.componentType = kAudioUnitType_Output;
