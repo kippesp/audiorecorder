@@ -19,7 +19,7 @@ static OSStatus inputCallback(void* a_ref_con,
                               [[maybe_unused]] AudioBufferList* a_data)
 {
   auto* ctx = static_cast<RecordingContext*>(a_ref_con);
-  uint32_t ch = ctx->channels_;
+  uint32_t ch = ctx->channels;
 
   // Set up buffer for AudioUnitRender.
   // render_buf_ is safe without synchronization because AUHAL invokes the
@@ -29,10 +29,10 @@ static OSStatus inputCallback(void* a_ref_con,
   buf_list.mBuffers[0].mNumberChannels = ch;
   buf_list.mBuffers[0].mDataByteSize =
       a_number_frames * ch * static_cast<UInt32>(sizeof(float));
-  buf_list.mBuffers[0].mData = ctx->render_buf_.data();
+  buf_list.mBuffers[0].mData = ctx->render_buf.data();
 
   OSStatus status =
-      AudioUnitRender(ctx->audio_unit_, a_action_flags, a_time_stamp,
+      AudioUnitRender(ctx->audio_unit, a_action_flags, a_time_stamp,
                       a_bus_number, a_number_frames, &buf_list);
   if (status != noErr)
     return status;
@@ -40,18 +40,18 @@ static OSStatus inputCallback(void* a_ref_con,
   size_t sample_count = static_cast<size_t>(a_number_frames) * ch;
 
   // Push to monitor ring (drop silently on overrun)
-  if (ctx->monitor_ring_.capacity() > 0)
-    ctx->monitor_ring_.push({ctx->render_buf_.data(), sample_count});
+  if (ctx->monitor_ring.capacity() > 0)
+    ctx->monitor_ring.push({ctx->render_buf.data(), sample_count});
 
   // Push into recording ring buffer
-  if (!ctx->ring_.push({ctx->render_buf_.data(), sample_count}))
+  if (!ctx->ring.push({ctx->render_buf.data(), sample_count}))
   {
-    ctx->overrun_frames_.fetch_add(a_number_frames, std::memory_order_relaxed);
+    ctx->overrun_frames.fetch_add(a_number_frames, std::memory_order_relaxed);
     return noErr;
   }
 
   // Peak metering
-  const float* src = ctx->render_buf_.data();
+  const float* src = ctx->render_buf.data();
   float peak_l = 0.0f, peak_r = 0.0f;
   if (ch == 2)
   {
@@ -75,12 +75,12 @@ static OSStatus inputCallback(void* a_ref_con,
     {
     }
   };
-  updatePeak(ctx->peak_l_, peak_l);
-  updatePeak(ctx->peak_r_, peak_r);
-  updatePeak(ctx->session_peak_l_, peak_l);
-  updatePeak(ctx->session_peak_r_, peak_r);
+  updatePeak(ctx->peak_l, peak_l);
+  updatePeak(ctx->peak_r, peak_r);
+  updatePeak(ctx->session_peak_l, peak_l);
+  updatePeak(ctx->session_peak_r, peak_r);
 
-  ctx->writer_sem_.release();
+  ctx->writer_sem.release();
   return noErr;
 }
 
@@ -89,7 +89,7 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
                                                Float64 a_sample_rate,
                                                uint32_t a_record_channels)
 {
-  a_ctx.channels_ = a_record_channels;
+  a_ctx.channels = a_record_channels;
 
   // Ring buffer sized at ~60 seconds to absorb macOS disk I/O stalls
   // (Spotlight indexing, Time Machine snapshots, APFS CoW bursts) that can
@@ -97,7 +97,7 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
   // (rounded to power-of-2 by RingBuffer::init).
   size_t ring_frames = static_cast<size_t>(a_sample_rate * 60.0);
   size_t ring_samples = ring_frames * a_record_channels;
-  a_ctx.ring_.init(ring_samples);
+  a_ctx.ring.init(ring_samples);
 
   // Find AUHAL component
   AudioComponentDescription desc = {};
@@ -109,20 +109,20 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
   if (!comp)
     return std::unexpected(static_cast<OSStatus>(fnfErr));
 
-  OSStatus status = AudioComponentInstanceNew(comp, &a_ctx.audio_unit_);
+  OSStatus status = AudioComponentInstanceNew(comp, &a_ctx.audio_unit);
   if (status != noErr)
     return std::unexpected(status);
 
   auto fail = [&](OSStatus a_status) -> std::unexpected<OSStatus> {
-    AudioComponentInstanceDispose(a_ctx.audio_unit_);
-    a_ctx.audio_unit_ = nullptr;
+    AudioComponentInstanceDispose(a_ctx.audio_unit);
+    a_ctx.audio_unit = nullptr;
     return std::unexpected(a_status);
   };
 
   // Enable input on bus 1
   UInt32 enable_io = 1;
   status = AudioUnitSetProperty(
-      a_ctx.audio_unit_, kAudioOutputUnitProperty_EnableIO,
+      a_ctx.audio_unit, kAudioOutputUnitProperty_EnableIO,
       kAudioUnitScope_Input, 1, &enable_io, sizeof(enable_io));
   if (status != noErr)
     return fail(status);
@@ -130,14 +130,14 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
   // Disable output on bus 0
   enable_io = 0;
   status = AudioUnitSetProperty(
-      a_ctx.audio_unit_, kAudioOutputUnitProperty_EnableIO,
+      a_ctx.audio_unit, kAudioOutputUnitProperty_EnableIO,
       kAudioUnitScope_Output, 0, &enable_io, sizeof(enable_io));
   if (status != noErr)
     return fail(status);
 
   // Set input device
   status = AudioUnitSetProperty(
-      a_ctx.audio_unit_, kAudioOutputUnitProperty_CurrentDevice,
+      a_ctx.audio_unit, kAudioOutputUnitProperty_CurrentDevice,
       kAudioUnitScope_Global, 0, &a_device_id, sizeof(a_device_id));
   if (status != noErr)
     return fail(status);
@@ -154,14 +154,14 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
   fmt.mBytesPerPacket = fmt.mBytesPerFrame;
 
   status =
-      AudioUnitSetProperty(a_ctx.audio_unit_, kAudioUnitProperty_StreamFormat,
+      AudioUnitSetProperty(a_ctx.audio_unit, kAudioUnitProperty_StreamFormat,
                            kAudioUnitScope_Output, 1, &fmt, sizeof(fmt));
   if (status != noErr)
     return fail(status);
 
   // Set input callback
   AURenderCallbackStruct cb = {inputCallback, &a_ctx};
-  status = AudioUnitSetProperty(a_ctx.audio_unit_,
+  status = AudioUnitSetProperty(a_ctx.audio_unit,
                                 kAudioOutputUnitProperty_SetInputCallback,
                                 kAudioUnitScope_Global, 0, &cb, sizeof(cb));
   if (status != noErr)
@@ -171,14 +171,14 @@ std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
   UInt32 max_frames = 4096;
   UInt32 prop_size = sizeof(max_frames);
   status = AudioUnitGetProperty(
-      a_ctx.audio_unit_, kAudioUnitProperty_MaximumFramesPerSlice,
+      a_ctx.audio_unit, kAudioUnitProperty_MaximumFramesPerSlice,
       kAudioUnitScope_Global, 0, &max_frames, &prop_size);
   if (status != noErr)
     return fail(status);
-  a_ctx.render_buf_.resize(static_cast<size_t>(max_frames) * a_record_channels);
+  a_ctx.render_buf.resize(static_cast<size_t>(max_frames) * a_record_channels);
 
   // Initialize audio unit
-  status = AudioUnitInitialize(a_ctx.audio_unit_);
+  status = AudioUnitInitialize(a_ctx.audio_unit);
   if (status != noErr)
     return fail(status);
 

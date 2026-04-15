@@ -10,7 +10,7 @@
 
 // Setup AUHAL capture unit -- returns void on success, OSStatus on failure.
 // Allocates ring buffer (~60s) and render buffer.
-// On success, ctx.audio_unit_ is set (caller should wrap in AudioUnitGuard).
+// On success, ctx.audio_unit is set (caller should wrap in AudioUnitGuard).
 std::expected<void, OSStatus> setupCaptureUnit(RecordingContext& a_ctx,
                                                AudioDeviceID a_device_id,
                                                Float64 a_sample_rate,

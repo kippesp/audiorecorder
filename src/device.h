@@ -9,11 +9,11 @@
 #include <vector>
 
 struct AudioDevice {
-  AudioDeviceID id_ = kAudioObjectUnknown;
-  std::string name_;
-  std::string uid_;
-  Float64 sample_rate_ = 0;
-  uint32_t input_channels_ = 0;
+  AudioDeviceID id = kAudioObjectUnknown;
+  std::string name;
+  std::string uid;
+  Float64 sample_rate = 0;
+  uint32_t input_channels = 0;
 };
 
 std::vector<AudioDevice> getInputDevices();

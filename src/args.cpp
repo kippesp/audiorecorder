@@ -54,19 +54,19 @@ Args parseArgs(int a_argc, char* a_argv[])
     switch (opt)
     {
       case 'o':
-        args.output_path_ = optarg;
+        args.output_path = optarg;
         break;
       case 'd':
-        args.device_selector_ = optarg;
+        args.device_selector = optarg;
         break;
       case 'l':
-        args.list_devices_ = true;
+        args.list_devices = true;
         break;
       case 'M':
-        args.monitor_ = true;
+        args.monitor = true;
         break;
       case 't':
-        args.test_ = true;
+        args.test = true;
         break;
       case 'D':
         {
@@ -80,14 +80,14 @@ Args parseArgs(int a_argc, char* a_argv[])
                 optarg);
             exit(1);
           }
-          args.max_duration_min_ = static_cast<int>(val);
+          args.max_duration_min = static_cast<int>(val);
           break;
         }
       case 'q':
-        args.quiet_ = true;
+        args.quiet = true;
         break;
       case 'v':
-        args.verbose_ = true;
+        args.verbose = true;
         break;
       case 'h':
         printUsage();
@@ -105,7 +105,7 @@ Args parseArgs(int a_argc, char* a_argv[])
     }
   }
 
-  if (args.quiet_ && args.verbose_)
+  if (args.quiet && args.verbose)
   {
     printErr("Error: --quiet and --verbose are mutually exclusive.\n");
     exit(1);
