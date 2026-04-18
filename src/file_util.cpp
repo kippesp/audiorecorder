@@ -18,8 +18,7 @@ uint64_t getFreeBytes(const std::string& a_path)
   return info.available;
 }
 
-static std::expected<std::string, std::string> expandHome(
-    const std::string& a_path)
+std::expected<std::string, std::string> expandHome(const std::string& a_path)
 {
   if (a_path.starts_with("~/"))
   {

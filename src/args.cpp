@@ -5,8 +5,31 @@
 #include "git_version.h"
 #include "util.h"
 
+#include <charconv>
 #include <cstdlib>
+#include <cstring>
+#include <expected>
+#include <format>
 #include <getopt.h>
+#include <string>
+#include <system_error>
+#include <utility>
+
+static std::expected<int, std::string> parsePositiveMinutes(
+    const char* a_optarg, const char* a_what)
+{
+  const char* begin = a_optarg;
+  const char* end = begin + std::strlen(begin);
+  int val = 0;
+  auto [ptr, ec] = std::from_chars(begin, end, val);
+  if (ec != std::errc {} || ptr != end || val <= 0)
+  {
+    return std::unexpected(std::format(
+        "Error: invalid {} '{}'. Expected a positive integer (minutes).\n",
+        a_what, a_optarg));
+  }
+  return val;
+}
 
 static void printUsage()
 {
@@ -25,6 +48,10 @@ static void printUsage()
       "  -q, --quiet               Suppress level meter display\n"
       "  -v, --verbose             Print diagnostic output "
       "(buffer health, overruns)\n"
+      "      --extend <input.caf>  Extend mode: pad an existing ra recording "
+      "(requires --pad-to and -o)\n"
+      "      --pad-to <min>        Target declared duration in minutes "
+      "(extend mode)\n"
       "  -h, --help                Show this help\n"
       "  -V, --version             Show version and exit\n",
       RA_PROGRAM_NAME);
@@ -32,7 +59,12 @@ static void printUsage()
 
 Args parseArgs(int a_argc, char* a_argv[])
 {
-  Args args;
+  RecordingArgs rec;
+  std::optional<std::string> extend_caf_file;
+  std::optional<int> pad_to_min;
+
+  constexpr int k_opt_extend = 256;
+  constexpr int k_opt_pad_to = 257;
 
   static const struct option long_options[] = {
       {"output", required_argument, nullptr, 'o'},
@@ -43,6 +75,8 @@ Args parseArgs(int a_argc, char* a_argv[])
       {"max-duration", required_argument, nullptr, 'D'},
       {"quiet", no_argument, nullptr, 'q'},
       {"verbose", no_argument, nullptr, 'v'},
+      {"extend", required_argument, nullptr, k_opt_extend},
+      {"pad-to", required_argument, nullptr, k_opt_pad_to},
       {"help", no_argument, nullptr, 'h'},
       {"version", no_argument, nullptr, 'V'},
       {nullptr, 0, nullptr, 0}};
@@ -54,41 +88,51 @@ Args parseArgs(int a_argc, char* a_argv[])
     switch (opt)
     {
       case 'o':
-        args.output_path = optarg;
+        rec.output_path = optarg;
         break;
       case 'd':
-        args.device_selector = optarg;
+        rec.device_selector = optarg;
         break;
       case 'l':
-        args.list_devices = true;
+        rec.list_devices = true;
         break;
       case 'M':
-        args.monitor = true;
+        rec.monitor = true;
         break;
       case 't':
-        args.test = true;
+        rec.test = true;
         break;
       case 'D':
         {
-          char* end = nullptr;
-          long val = strtol(optarg, &end, 10);
-          if (end == optarg || *end != '\0' || val <= 0)
+          auto result = parsePositiveMinutes(optarg, "duration");
+          if (!result)
           {
-            printErr(
-                "Error: invalid duration '{}'. "
-                "Expected a positive integer (minutes).\n",
-                optarg);
+            printErr("{}", result.error());
             exit(1);
           }
-          args.max_duration_min = static_cast<int>(val);
+          rec.max_duration_min = *result;
           break;
         }
       case 'q':
-        args.quiet = true;
+        rec.quiet = true;
         break;
       case 'v':
-        args.verbose = true;
+        rec.verbose = true;
         break;
+      case k_opt_extend:
+        extend_caf_file = optarg;
+        break;
+      case k_opt_pad_to:
+        {
+          auto result = parsePositiveMinutes(optarg, "--pad-to value");
+          if (!result)
+          {
+            printErr("{}", result.error());
+            exit(1);
+          }
+          pad_to_min = *result;
+          break;
+        }
       case 'h':
         printUsage();
         exit(0);
@@ -105,11 +149,38 @@ Args parseArgs(int a_argc, char* a_argv[])
     }
   }
 
-  if (args.quiet && args.verbose)
+  bool any_extend = extend_caf_file || pad_to_min;
+  if (any_extend)
+  {
+    // output_path is shared with extend mode, so exclude it from the
+    // "recording flags are all at default" check. Comparing against a
+    // default-constructed RecordingArgs via the defaulted operator== covers
+    // every recording field structurally -- adding a new RecordingArgs field
+    // is automatically rejected here without touching this predicate.
+    RecordingArgs without_output = rec;
+    without_output.output_path.reset();
+    bool recording_clean = (without_output == RecordingArgs {});
+    bool have_required = extend_caf_file && pad_to_min && rec.output_path;
+    bool no_positional = (optind == a_argc);
+    if (!have_required || !recording_clean || !no_positional)
+    {
+      printErr(
+          "Error: --extend requires exactly --extend <input.caf> "
+          "--pad-to <min> -o <output.caf> and no other arguments.\n");
+      exit(1);
+    }
+    return ExtendArgs {
+        .extend_caf_file = std::move(*extend_caf_file),
+        .pad_to_min = *pad_to_min,
+        .output_path = std::move(*rec.output_path),
+    };
+  }
+
+  if (rec.quiet && rec.verbose)
   {
     printErr("Error: --quiet and --verbose are mutually exclusive.\n");
     exit(1);
   }
 
-  return args;
+  return rec;
 }

@@ -52,6 +52,7 @@ add_executable(ra
     args.cpp
     capture.cpp
     device.cpp
+    extend_caf.cpp
     monitor.cpp
     output_file.cpp
     signal_handler.cpp
@@ -62,6 +63,7 @@ add_executable(ra
     args.h
     capture.h
     config.h.in
+    extend_caf.h
     monitor.h
     device.h
     display.h

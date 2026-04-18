@@ -5,6 +5,7 @@
 #include <CoreAudio/CoreAudio.h>
 
 #include <expected>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,4 +20,5 @@ struct AudioDevice {
 std::vector<AudioDevice> getInputDevices();
 void printDeviceList(const std::vector<AudioDevice>& a_devices);
 std::expected<AudioDevice, std::string> resolveSelectedDevice(
-    const std::string& a_selector, const std::vector<AudioDevice>& a_devices);
+    const std::optional<std::string>& a_selector,
+    const std::vector<AudioDevice>& a_devices);

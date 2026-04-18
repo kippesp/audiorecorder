@@ -20,7 +20,7 @@
 #include <thread>
 
 struct Session {
-  // Declaration order is load-bearing: unit_guard must be destroyed before
+  // Declaration order is required: unit_guard must be destroyed before
   // file_guard so that no callbacks fire after the writer has drained and
   // the file has been closed.
   AudioUnitGuard unit_guard;  // RAII owner of the capture AudioUnit
@@ -43,7 +43,7 @@ struct SessionState {
 };
 
 static std::optional<SessionState> setupSession(
-    const Args& a_args, const std::vector<AudioDevice>& a_devices)
+    const RecordingArgs& a_args, const std::vector<AudioDevice>& a_devices)
 {
   auto device_result = resolveSelectedDevice(a_args.device_selector, a_devices);
   if (!device_result)
@@ -148,7 +148,7 @@ static std::optional<SessionState> setupSession(
 }
 
 static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
-                            const Args& a_args)
+                            const RecordingArgs& a_args)
 {
   std::atomic<bool> stop_requested {false};
   installSignalHandler(stop_requested);
@@ -257,7 +257,7 @@ static int runRecordingLoop(Session& a_session, RecordingContext& a_ctx,
 
 static void printSessionSummary(const Session& a_session,
                                 const RecordingContext& a_ctx,
-                                const Args& a_args)
+                                const RecordingArgs& a_args)
 {
   if (!a_args.quiet)
     printErr("\r\033[K");
@@ -317,7 +317,8 @@ static void printSessionSummary(const Session& a_session,
   }
 }
 
-int runSession(const Args& a_args, const std::vector<AudioDevice>& a_devices)
+int runSession(const RecordingArgs& a_args,
+               const std::vector<AudioDevice>& a_devices)
 {
   auto state = setupSession(a_args, a_devices);
   if (!state)

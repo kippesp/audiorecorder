@@ -7,4 +7,5 @@
 
 #include <vector>
 
-int runSession(const Args& a_args, const std::vector<AudioDevice>& a_devices);
+int runSession(const RecordingArgs& a_args,
+               const std::vector<AudioDevice>& a_devices);

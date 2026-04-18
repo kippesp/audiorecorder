@@ -47,6 +47,8 @@ ra [options]
   -D, --max-duration <min>  Stop after N minutes (default: unlimited)
   -q, --quiet               Suppress level meter display
   -v, --verbose             Print diagnostic output (buffer health, overruns)
+      --extend <input.caf>  Extend mode: pad an existing ra recording (requires --pad-to and -o)
+      --pad-to <min>        Target declared duration in minutes (extend mode)
   -h, --help                Show this help
   -V, --version             Show version and exit
 ```
@@ -71,6 +73,34 @@ Record from the default device with no time limit:
 ra -o recording.caf
 ```
 
+### Extend mode
+
+Motivation: when stitching several equally-sized recording chunks into a
+single long session in Logic Pro, extend mode fabricates a file at the
+target duration in a few seconds so the timeline is already the right
+length to drop the other chunks onto.
+
+`ra --extend <input.caf> --pad-to <minutes> -o <output.caf>` produces a new
+CAF whose declared duration is at least `<minutes>` minutes long, using a
+sparse hole for the padded region so the file consumes no additional disk
+space on APFS. The intended workflow is to open the padded output in Logic
+Pro, edit additional audio into the extended range, and export. The padded
+file is a disposable intermediate; the padded region decodes as silence.
+
+```
+ra --extend recording.caf --pad-to 90 -o recording_padded.caf
+```
+
+Only `ra`-produced CAF files are accepted as input. Extend mode requires
+`--extend`, `--pad-to`, and `-o` together; no other options may be
+combined with it.
+
+`-o` follows the same path rules as recording mode: `~/` is expanded,
+`.caf` is appended if missing, and if the resulting path already exists
+the output is written to `<stem>_1.caf`, `<stem>_2.caf`, and so on. The
+success message prints the final path. Delete the prior padded file
+before re-running if you want the same name reused.
+
 ## Architecture
 
 The ring buffer decouples real-time audio capture from disk I/O.
@@ -90,6 +120,7 @@ src/
   output_file.h/cpp     CAF file creation
   writer.h/cpp          Writer thread: ring drain, file write
   display.h/cpp         Level meter rendering and display loop
+  extend_caf.h/cpp      Extend mode: pad CAF recording via sparse hole
   signal_handler.h/cpp  Signal registration for graceful shutdown
   sleep_guard.h         RAII guard to prevent idle sleep during recording
   recording_context.h   Shared recording state and RAII resource guards
