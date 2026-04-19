@@ -24,7 +24,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
-set(RA_VERSION "1.2")
+set(RA_VERSION "1.3")
 
 configure_file(
   ${CMAKE_CURRENT_LIST_DIR}/config.h.in
