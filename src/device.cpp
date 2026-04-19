@@ -143,11 +143,12 @@ void printDeviceList(const std::vector<AudioDevice>& a_devices)
 }
 
 std::expected<AudioDevice, std::string> resolveSelectedDevice(
-    const std::string& a_selector, const std::vector<AudioDevice>& a_devices)
+    const std::optional<std::string>& a_selector,
+    const std::vector<AudioDevice>& a_devices)
 {
   AudioDevice device {};
 
-  if (a_selector.empty())
+  if (!a_selector)
   {
     AudioDeviceID default_id = getDefaultInputDevice();
     if (default_id == kAudioObjectUnknown)
@@ -167,10 +168,11 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
   }
   else
   {
+    const std::string& selector = *a_selector;
     // Try numeric index first (1-based)
     char* end = nullptr;
-    long idx = strtol(a_selector.c_str(), &end, 10);
-    if (end != a_selector.c_str() && *end == '\0' && idx >= 1 &&
+    long idx = strtol(selector.c_str(), &end, 10);
+    if (end != selector.c_str() && *end == '\0' && idx >= 1 &&
         idx <= static_cast<long>(a_devices.size()))
     {
       device = a_devices[static_cast<size_t>(idx - 1)];
@@ -180,7 +182,7 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
     {
       for (auto& d : a_devices)
       {
-        if (d.uid == a_selector)
+        if (d.uid == selector)
         {
           device = d;
           break;
@@ -192,7 +194,7 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
     {
       for (auto& d : a_devices)
       {
-        if (d.name == a_selector)
+        if (d.name == selector)
         {
           device = d;
           break;
@@ -204,7 +206,7 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       return std::unexpected(
           std::format("Error: no input device matches '{}'.\n"
                       "Use --list-devices to see available devices.\n",
-                      a_selector));
+                      selector));
     }
   }
 
