@@ -183,8 +183,8 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
 
   const std::string& selector = *a_selector;
 
-  // 1-based index has priority so a name that happens to be all-digits never
-  // shadows the index form printed by --list-devices.
+  // 1-based index has priority over UID so an all-digit UID never shadows
+  // the index form printed by --list-devices.
   size_t idx = 0;
   const char* sel_end = selector.data() + selector.size();
   auto [ptr, status] = std::from_chars(selector.data(), sel_end, idx);
@@ -192,13 +192,9 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       idx <= a_devices.size())
     return a_devices[idx - 1];
 
-  // UID first; a duplicated display name then falls back to the name field.
-  for (auto field : {&AudioDevice::uid, &AudioDevice::name})
-  {
-    if (auto it = std::ranges::find(a_devices, selector, field);
-        it != a_devices.end())
-      return *it;
-  }
+  if (auto it = std::ranges::find(a_devices, selector, &AudioDevice::uid);
+      it != a_devices.end())
+    return *it;
 
   return std::unexpected(
       std::format("Error: no input device matches '{}'.\n"

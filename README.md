@@ -40,7 +40,7 @@ beyond macOS system frameworks.  The design centers on these features:
 ra [options]
 
   -o, --output <path>       Output file path (default: ./Recording_YYYYMMDDTHHMMSS.caf)
-  -d, --device <#|name|uid> Input device by number, name, or UID (default: system default)
+  -d, --device <#|uid>      Input device by number or UID (default: system default)
   -l, --list-devices        List available input devices and exit
   -M, --monitor             Play input through default output device
   -t, --test                Test mode: capture audio without writing a file

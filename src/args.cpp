@@ -37,7 +37,7 @@ static void printUsage()
       "Usage: {} [options]\n\n"
       "  -o, --output <path>       Output file path "
       "(default: ./Recording_YYYYMMDDTHHMMSS.caf)\n"
-      "  -d, --device <#|name|uid> Input device by number, name, or UID "
+      "  -d, --device <#|uid>      Input device by number or UID "
       "(default: system default)\n"
       "  -l, --list-devices        List available input devices and exit\n"
       "  -M, --monitor             Play input through default output device\n"
