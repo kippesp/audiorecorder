@@ -5,7 +5,9 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 
+#include <memory>
 #include <string>
+#include <type_traits>
 
 // UTF-8 conversion of a CFString. Two-pass (size, fill) is the canonical CF
 // idiom for lossy substitution; CFStringGetCStringPtr's fast path returns
@@ -24,3 +26,14 @@ inline std::string cfToString(CFStringRef a_cfstr)
                    nullptr);
   return result;
 }
+
+struct CFReleaser {
+  void operator()(CFTypeRef a_ref) const
+  {
+    if (a_ref)
+      CFRelease(a_ref);
+  }
+};
+
+template <typename T>
+using CFRef = std::unique_ptr<std::remove_pointer_t<T>, CFReleaser>;
