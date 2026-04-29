@@ -137,11 +137,11 @@ Args parseArgs(int a_argc, char* a_argv[])
         printUsage();
         exit(0);
       case 'V':
-        printErr(
-            "ra - macOS Audio Recorder - v{}" RA_GIT_HASH_DISPLAY "\n"
-            "  Records 24-bit audio to CAF files\n"
-            "  " RA_COPYRIGHT "\n",
-            RA_VERSION);
+        printErr("ra - macOS Audio Recorder - v{}" RA_GIT_HASH_DISPLAY
+                 "\n"
+                 "  Records 24-bit audio to CAF files\n"
+                 "  " RA_COPYRIGHT "\n",
+                 RA_VERSION);
         exit(0);
       default:
         printUsage();
