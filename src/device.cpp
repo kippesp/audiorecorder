@@ -96,32 +96,42 @@ static AudioDeviceID getDefaultInputDevice()
       .value_or(kAudioObjectUnknown);
 }
 
-std::vector<AudioDevice> getInputDevices()
+std::expected<std::vector<AudioDevice>, std::string> getInputDevices()
 {
-  std::vector<AudioDevice> result;
-
   AudioObjectPropertyAddress prop = {kAudioHardwarePropertyDevices,
                                      kAudioObjectPropertyScopeGlobal,
                                      kAudioObjectPropertyElementMain};
   UInt32 size = 0;
-  if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &prop, 0,
-                                     nullptr, &size) != noErr)
-    return result;
+  if (OSStatus status = AudioObjectGetPropertyDataSize(
+          kAudioObjectSystemObject, &prop, 0, nullptr, &size);
+      status != noErr)
+    return std::unexpected(
+        std::format("Error: failed to query device list size ({}).\n",
+                    formatOSStatus(status)));
 
   std::vector<AudioDeviceID> ids(size / sizeof(AudioDeviceID));
-  if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &prop, 0, nullptr,
-                                 &size, ids.data()) != noErr)
-    return result;
+  if (OSStatus status = AudioObjectGetPropertyData(
+          kAudioObjectSystemObject, &prop, 0, nullptr, &size, ids.data());
+      status != noErr)
+    return std::unexpected(std::format(
+        "Error: failed to fetch device list ({}).\n", formatOSStatus(status)));
 
+  std::vector<AudioDevice> result;
   for (auto dev_id : ids)
   {
     auto channels = queryInputChannelCount(dev_id);
     if (!channels || *channels == 0)
       continue;
 
+    auto rate = queryFixedProperty<Float64>(
+        dev_id, kAudioDevicePropertyNominalSampleRate);
+    if (!rate)
+      continue;
+
     AudioDevice dev {};
     dev.id = dev_id;
     dev.input_channels = *channels;
+    dev.sample_rate = *rate;
 
     if (auto cf_name = queryCFProperty<CFStringRef>(
             dev_id, kAudioDevicePropertyDeviceNameCFString))
@@ -131,13 +141,6 @@ std::vector<AudioDevice> getInputDevices()
     if (auto cf_uid =
             queryCFProperty<CFStringRef>(dev_id, kAudioDevicePropertyDeviceUID))
       dev.uid = sanitizeForDisplay(cfToString(cf_uid->get()));
-
-    if (auto rate = queryFixedProperty<Float64>(
-            dev_id, kAudioDevicePropertyNominalSampleRate))
-      dev.sample_rate = *rate;
-    else
-      printErr("Warning: could not query sample rate for device '{}'.\n",
-               dev.name);
 
     result.push_back(std::move(dev));
   }

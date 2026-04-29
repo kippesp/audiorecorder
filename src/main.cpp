@@ -30,12 +30,17 @@ int main(int argc, char* argv[])
 
   auto& rec = std::get<RecordingArgs>(args);
   auto input_devices = getInputDevices();
+  if (!input_devices)
+  {
+    printErr(input_devices.error());
+    return 1;
+  }
 
   if (rec.list_devices)
   {
-    printDeviceList(input_devices);
-    return input_devices.empty() ? 1 : 0;
+    printDeviceList(*input_devices);
+    return input_devices->empty() ? 1 : 0;
   }
 
-  return runSession(rec, input_devices);
+  return runSession(rec, *input_devices);
 }

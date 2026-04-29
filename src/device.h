@@ -17,7 +17,7 @@ struct AudioDevice {
   uint32_t input_channels = 0;
 };
 
-std::vector<AudioDevice> getInputDevices();
+std::expected<std::vector<AudioDevice>, std::string> getInputDevices();
 void printDeviceList(const std::vector<AudioDevice>& a_devices);
 std::expected<AudioDevice, std::string> resolveSelectedDevice(
     const std::optional<std::string>& a_selector,
