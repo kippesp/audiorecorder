@@ -11,35 +11,89 @@
 #include <format>
 #include <system_error>
 
+namespace {
+
+template <typename T>
+std::expected<T, OSStatus> queryFixedProperty(
+    AudioObjectID a_id, AudioObjectPropertySelector a_selector,
+    AudioObjectPropertyScope a_scope = kAudioObjectPropertyScopeGlobal)
+{
+  AudioObjectPropertyAddress prop {a_selector, a_scope,
+                                   kAudioObjectPropertyElementMain};
+  T value {};
+  UInt32 size = sizeof(value);
+  if (OSStatus status =
+          AudioObjectGetPropertyData(a_id, &prop, 0, nullptr, &size, &value);
+      status != noErr)
+    return std::unexpected(status);
+  return value;
+}
+
+template <typename T>
+std::expected<CFRef<T>, OSStatus> queryCFProperty(
+    AudioObjectID a_id, AudioObjectPropertySelector a_selector,
+    AudioObjectPropertyScope a_scope = kAudioObjectPropertyScopeGlobal)
+{
+  AudioObjectPropertyAddress prop {a_selector, a_scope,
+                                   kAudioObjectPropertyElementMain};
+  T raw = nullptr;
+  UInt32 size = sizeof(raw);
+  if (OSStatus status =
+          AudioObjectGetPropertyData(a_id, &prop, 0, nullptr, &size, &raw);
+      status != noErr)
+    return std::unexpected(status);
+  if (!raw)
+    return std::unexpected(kAudioHardwareUnspecifiedError);
+  return CFRef<T>(raw);
+}
+
+std::expected<uint32_t, OSStatus> queryInputChannelCount(AudioObjectID a_id)
+{
+  AudioObjectPropertyAddress prop {kAudioDevicePropertyStreamConfiguration,
+                                   kAudioDevicePropertyScopeInput,
+                                   kAudioObjectPropertyElementMain};
+  UInt32 size = 0;
+  if (OSStatus status =
+          AudioObjectGetPropertyDataSize(a_id, &prop, 0, nullptr, &size);
+      status != noErr)
+    return std::unexpected(status);
+  std::vector<uint8_t> buf(size);
+  auto* list = reinterpret_cast<AudioBufferList*>(buf.data());
+  if (OSStatus status =
+          AudioObjectGetPropertyData(a_id, &prop, 0, nullptr, &size, list);
+      status != noErr)
+    return std::unexpected(status);
+  uint32_t total = 0;
+  for (UInt32 i = 0; i < list->mNumberBuffers; ++i)
+    total += list->mBuffers[i].mNumberChannels;
+  return total;
+}
+
+}  // namespace
+
 // Caps display length and replaces control characters and bytes outside the
 // printable-ASCII range so a hostile or oddly-named device cannot inject
 // terminal escape sequences into stderr output. Multi-byte UTF-8 names lose
 // fidelity here; that tradeoff is intentional.
-static std::string cfToDisplay(CFStringRef a_cfstr)
+static std::string sanitizeForDisplay(std::string a_str)
 {
   constexpr size_t k_max_device_name_len = 256;
-  std::string result = cfToString(a_cfstr);
-  if (result.size() > k_max_device_name_len)
-    result.resize(k_max_device_name_len);
-  for (char& c : result)
+  if (a_str.size() > k_max_device_name_len)
+    a_str.resize(k_max_device_name_len);
+  for (char& c : a_str)
   {
     auto uc = static_cast<unsigned char>(c);
     if (uc < 0x20 || uc > 0x7E)
       c = '_';
   }
-  return result;
+  return a_str;
 }
 
 static AudioDeviceID getDefaultInputDevice()
 {
-  AudioDeviceID dev_id = kAudioObjectUnknown;
-  AudioObjectPropertyAddress prop = {kAudioHardwarePropertyDefaultInputDevice,
-                                     kAudioObjectPropertyScopeGlobal,
-                                     kAudioObjectPropertyElementMain};
-  UInt32 size = sizeof(dev_id);
-  AudioObjectGetPropertyData(kAudioObjectSystemObject, &prop, 0, nullptr, &size,
-                             &dev_id);
-  return dev_id;
+  return queryFixedProperty<AudioDeviceID>(
+             kAudioObjectSystemObject, kAudioHardwarePropertyDefaultInputDevice)
+      .value_or(kAudioObjectUnknown);
 }
 
 std::vector<AudioDevice> getInputDevices()
@@ -61,58 +115,27 @@ std::vector<AudioDevice> getInputDevices()
 
   for (auto dev_id : ids)
   {
-    prop = {kAudioDevicePropertyStreamConfiguration,
-            kAudioDevicePropertyScopeInput, kAudioObjectPropertyElementMain};
-    if (AudioObjectGetPropertyDataSize(dev_id, &prop, 0, nullptr, &size) !=
-        noErr)
-      continue;
-
-    std::vector<uint8_t> cfg_buf(size);
-    auto* buf_list = reinterpret_cast<AudioBufferList*>(cfg_buf.data());
-    if (AudioObjectGetPropertyData(dev_id, &prop, 0, nullptr, &size,
-                                   buf_list) != noErr)
-      continue;
-
-    uint32_t in_ch = 0;
-    for (UInt32 i = 0; i < buf_list->mNumberBuffers; i++)
-      in_ch += buf_list->mBuffers[i].mNumberChannels;
-    if (in_ch == 0)
+    auto channels = queryInputChannelCount(dev_id);
+    if (!channels || *channels == 0)
       continue;
 
     AudioDevice dev {};
     dev.id = dev_id;
-    dev.input_channels = in_ch;
+    dev.input_channels = *channels;
 
-    CFStringRef cf_name = nullptr;
-    prop = {kAudioDevicePropertyDeviceNameCFString,
-            kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
-    size = sizeof(cf_name);
-    if (AudioObjectGetPropertyData(dev_id, &prop, 0, nullptr, &size,
-                                   &cf_name) == noErr &&
-        cf_name)
-    {
-      dev.name = cfToDisplay(cf_name);
-      CFRelease(cf_name);
-    }
+    if (auto cf_name = queryCFProperty<CFStringRef>(
+            dev_id, kAudioDevicePropertyDeviceNameCFString))
+      dev.name = sanitizeForDisplay(cfToString(cf_name->get()));
 
     // UID is persistent across reboots; usable as a stable CLI selector.
-    CFStringRef cf_uid = nullptr;
-    prop = {kAudioDevicePropertyDeviceUID, kAudioObjectPropertyScopeGlobal,
-            kAudioObjectPropertyElementMain};
-    size = sizeof(cf_uid);
-    if (AudioObjectGetPropertyData(dev_id, &prop, 0, nullptr, &size, &cf_uid) ==
-            noErr &&
-        cf_uid)
-    {
-      dev.uid = cfToDisplay(cf_uid);
-      CFRelease(cf_uid);
-    }
+    if (auto cf_uid =
+            queryCFProperty<CFStringRef>(dev_id, kAudioDevicePropertyDeviceUID))
+      dev.uid = sanitizeForDisplay(cfToString(cf_uid->get()));
 
-    prop = {kAudioDevicePropertyNominalSampleRate,
-            kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
-    size = sizeof(dev.sample_rate);
-    if (AudioObjectGetPropertyData(dev_id, &prop, 0, nullptr, &size,
-                                   &dev.sample_rate) != noErr)
+    if (auto rate = queryFixedProperty<Float64>(
+            dev_id, kAudioDevicePropertyNominalSampleRate))
+      dev.sample_rate = *rate;
+    else
       printErr("Warning: could not query sample rate for device '{}'.\n",
                dev.name);
 
@@ -151,13 +174,11 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       return std::unexpected(
           std::string("Error: no default input device found.\n"));
 
-    auto it = std::ranges::find_if(
-        a_devices,
-        [default_id](const AudioDevice& d) { return d.id == default_id; });
-    if (it == a_devices.end())
-      return std::unexpected(
-          std::string("Error: default input device not available.\n"));
-    return *it;
+    if (auto it = std::ranges::find(a_devices, default_id, &AudioDevice::id);
+        it != a_devices.end())
+      return *it;
+    return std::unexpected(
+        std::string("Error: default input device not available.\n"));
   }
 
   const std::string& selector = *a_selector;
@@ -171,17 +192,13 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       idx <= a_devices.size())
     return a_devices[idx - 1];
 
-  if (auto it = std::ranges::find_if(
-          a_devices,
-          [&selector](const AudioDevice& d) { return d.uid == selector; });
-      it != a_devices.end())
-    return *it;
-
-  if (auto it = std::ranges::find_if(
-          a_devices,
-          [&selector](const AudioDevice& d) { return d.name == selector; });
-      it != a_devices.end())
-    return *it;
+  // UID first; a duplicated display name then falls back to the name field.
+  for (auto field : {&AudioDevice::uid, &AudioDevice::name})
+  {
+    if (auto it = std::ranges::find(a_devices, selector, field);
+        it != a_devices.end())
+      return *it;
+  }
 
   return std::unexpected(
       std::format("Error: no input device matches '{}'.\n"

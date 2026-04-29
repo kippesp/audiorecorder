@@ -62,6 +62,7 @@ add_executable(ra
     file_util.cpp
     args.h
     capture.h
+    cf_util.h
     config.h.in
     extend_caf.h
     monitor.h
