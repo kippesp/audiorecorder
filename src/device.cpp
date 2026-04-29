@@ -5,8 +5,19 @@
 
 #include <CoreServices/CoreServices.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <format>
+
+template <typename Predicate>
+static const AudioDevice* findDevice(const std::vector<AudioDevice>& a_devices,
+                                     Predicate a_matches)
+{
+  auto it = std::ranges::find_if(a_devices, a_matches);
+  if (it == a_devices.end())
+    return nullptr;
+  return &*it;
+}
 
 static std::string cfToString(CFStringRef a_cfstr)
 {
@@ -146,69 +157,46 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
     const std::optional<std::string>& a_selector,
     const std::vector<AudioDevice>& a_devices)
 {
-  AudioDevice device {};
-
   if (!a_selector)
   {
     AudioDeviceID default_id = getDefaultInputDevice();
     if (default_id == kAudioObjectUnknown)
       return std::unexpected(
           std::string("Error: no default input device found.\n"));
-    for (auto& d : a_devices)
-    {
-      if (d.id == default_id)
-      {
-        device = d;
-        break;
-      }
-    }
-    if (device.id == kAudioObjectUnknown)
+
+    const auto* device = findDevice(
+        a_devices,
+        [default_id](const AudioDevice& d) { return d.id == default_id; });
+    if (!device)
       return std::unexpected(
           std::string("Error: default input device not available.\n"));
-  }
-  else
-  {
-    const std::string& selector = *a_selector;
-    // Try numeric index first (1-based)
-    char* end = nullptr;
-    long idx = strtol(selector.c_str(), &end, 10);
-    if (end != selector.c_str() && *end == '\0' && idx >= 1 &&
-        idx <= static_cast<long>(a_devices.size()))
-    {
-      device = a_devices[static_cast<size_t>(idx - 1)];
-    }
-    // Then match UID
-    if (device.id == kAudioObjectUnknown)
-    {
-      for (auto& d : a_devices)
-      {
-        if (d.uid == selector)
-        {
-          device = d;
-          break;
-        }
-      }
-    }
-    // Then match name
-    if (device.id == kAudioObjectUnknown)
-    {
-      for (auto& d : a_devices)
-      {
-        if (d.name == selector)
-        {
-          device = d;
-          break;
-        }
-      }
-    }
-    if (device.id == kAudioObjectUnknown)
-    {
-      return std::unexpected(
-          std::format("Error: no input device matches '{}'.\n"
-                      "Use --list-devices to see available devices.\n",
-                      selector));
-    }
+    return *device;
   }
 
-  return device;
+  const std::string& selector = *a_selector;
+  // Try numeric index first (1-based)
+  char* end = nullptr;
+  long idx = strtol(selector.c_str(), &end, 10);
+  if (end != selector.c_str() && *end == '\0' && idx >= 1 &&
+      idx <= static_cast<long>(a_devices.size()))
+  {
+    return a_devices[static_cast<size_t>(idx - 1)];
+  }
+
+  // Then match UID
+  if (const auto* device = findDevice(
+          a_devices,
+          [&selector](const AudioDevice& d) { return d.uid == selector; }))
+    return *device;
+
+  // Then match name
+  if (const auto* device = findDevice(
+          a_devices,
+          [&selector](const AudioDevice& d) { return d.name == selector; }))
+    return *device;
+
+  return std::unexpected(
+      std::format("Error: no input device matches '{}'.\n"
+                  "Use --list-devices to see available devices.\n",
+                  selector));
 }
