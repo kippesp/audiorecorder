@@ -30,6 +30,7 @@ namespace {
 constexpr int kCafChunkTypeSize = 4;
 constexpr int kCafChunkHeaderSize = 12;
 constexpr int kCafDataEditCountSize = 4;
+constexpr int kSecondsPerMinute = 60;
 
 struct CafFormat {
   double sample_rate;
@@ -132,10 +133,9 @@ std::expected<CafFormat, std::string> readCafFormat(const std::string& a_path)
     return std::unexpected(
         std::format("Error: '{}' has no audio frames.\n", a_path));
 
-  // Verified against a sample ra CAF (60_sec_test_2.caf):
-  // kAudioFilePropertyDataOffset reports the offset of the first audio byte,
-  // past the 'data' chunk's 4-byte mEditCount prefix. Back up past the chunk
-  // header and mEditCount to reach the chunk header start.
+  // kAudioFilePropertyDataOffset points at the first audio byte, past the
+  // 'data' chunk's 4-byte mEditCount prefix. Back up past the chunk header
+  // and mEditCount to land on the chunk header start.
   int64_t data_header_offset = static_cast<int64_t>(data_offset) -
                                (kCafChunkHeaderSize + kCafDataEditCountSize);
 
@@ -178,7 +178,7 @@ std::expected<void, std::string> patchAndExtendTmp(
       kCafDataEditCountSize +
       a_target_frames * static_cast<int64_t>(a_fmt.bytes_per_frame);
 
-  // Layout: [type:4][size:8][payload...]. Patch the 8-byte size field.
+  // CAF chunk header: [type:4][size:8][payload]; size is big-endian.
   off_t size_field_offset =
       static_cast<off_t>(a_fmt.data_header_offset + kCafChunkTypeSize);
   uint64_t size_be =
@@ -196,27 +196,16 @@ std::expected<void, std::string> patchAndExtendTmp(
         "Error: could not extend file length of '{}' (errno {}: {}).\n",
         a_tmp_path, errno, std::strerror(errno)));
 
-  // Durability: force a full drive-cache flush before rename, so a crash
-  // between here and the rename cannot surface a file with stale header
-  // contents under the final name. F_FULLFSYNC is the macOS primitive that
-  // actually commits to platter; plain fsync only flushes OS buffers.
-  if (fcntl(fd, F_FULLFSYNC) == -1)
-    return std::unexpected(
-        std::format("Error: F_FULLFSYNC of '{}' failed (errno {}: {}).\n",
-                    a_tmp_path, errno, std::strerror(errno)));
-
-  return {};
+  // Durability before rename: a crash between here and rename otherwise
+  // surfaces a file with stale header contents under the final name.
+  return fullFsync(fd, a_tmp_path);
 }
 
 }  // namespace
 
 std::expected<ExtendResult, std::string> extendCafFile(const ExtendArgs& a_args)
 {
-  const std::string& input_arg = a_args.extend_caf_file;
-  int pad_to_min = a_args.pad_to_min;
-  const std::string& output_arg = a_args.output_path;
-
-  auto resolved_input_r = expandHome(input_arg);
+  auto resolved_input_r = expandHome(a_args.extend_caf_file);
   if (!resolved_input_r)
     return std::unexpected(std::move(resolved_input_r.error()));
   std::string resolved_input = std::move(*resolved_input_r);
@@ -226,17 +215,17 @@ std::expected<ExtendResult, std::string> extendCafFile(const ExtendArgs& a_args)
     return std::unexpected(std::move(fmt_r.error()));
   const CafFormat& fmt = *fmt_r;
 
-  double target_frames_exact =
-      static_cast<double>(pad_to_min) * 60.0 * fmt.sample_rate;
+  double target_frames_exact = static_cast<double>(a_args.pad_to_min) *
+                               kSecondsPerMinute * fmt.sample_rate;
   int64_t target_frames = static_cast<int64_t>(std::ceil(target_frames_exact));
 
   if (target_frames <= fmt.frame_count)
     return std::unexpected(std::format(
         "Error: --pad-to {} minutes does not exceed the existing duration "
         "of '{}'.\n",
-        pad_to_min, resolved_input));
+        a_args.pad_to_min, resolved_input));
 
-  auto resolved_output_r = resolveOutputPath(output_arg);
+  auto resolved_output_r = resolveOutputPath(a_args.output_path);
   if (!resolved_output_r)
     return std::unexpected(std::move(resolved_output_r.error()));
   std::string resolved_output = std::move(*resolved_output_r);
@@ -272,29 +261,23 @@ std::expected<ExtendResult, std::string> extendCafFile(const ExtendArgs& a_args)
         std::format("Error: rename of '{}' onto '{}' failed ({}).\n", tmp_path,
                     resolved_output, ec.message()));
 
-  // Durability: force a full drive-cache flush on the parent directory so
-  // the rename's new directory entry is durably committed after the tmp
-  // file's contents.
-  std::filesystem::path parent_dir =
-      std::filesystem::path(resolved_output).parent_path();
-  if (parent_dir.empty())
-    parent_dir = ".";
+  // Directory durability: ensures the rename's new entry is committed after
+  // the tmp file's contents. Failures here leave the file under its final
+  // name but with an unflushed directory entry; tmp_path no longer exists.
+  std::string parent_dir = directoryOf(resolved_output);
   int dir_fd = open(parent_dir.c_str(), O_RDONLY);
   if (dir_fd < 0)
     return std::unexpected(
         std::format("Error: could not open parent directory '{}' for fsync "
                     "(errno {}: {}).\n",
-                    parent_dir.string(), errno, std::strerror(errno)));
+                    parent_dir, errno, std::strerror(errno)));
   FdCloser dir_guard {dir_fd};
-  if (fcntl(dir_fd, F_FULLFSYNC) == -1)
-    return std::unexpected(
-        std::format("Error: F_FULLFSYNC of parent directory '{}' failed "
-                    "(errno {}: {}).\n",
-                    parent_dir.string(), errno, std::strerror(errno)));
+  if (auto fsync_result = fullFsync(dir_fd, parent_dir); !fsync_result)
+    return std::unexpected(std::move(fsync_result.error()));
 
   return ExtendResult {
       .resolved_input = std::move(resolved_input),
       .resolved_output = std::move(resolved_output),
-      .pad_to_minutes = pad_to_min,
+      .pad_to_minutes = a_args.pad_to_min,
   };
 }

@@ -1,45 +1,32 @@
 // device.cpp -- Audio input device enumeration and resolution.
 
 #include "device.h"
+#include "cf_util.h"
 #include "util.h"
 
 #include <CoreServices/CoreServices.h>
 
 #include <algorithm>
-#include <cstdlib>
+#include <charconv>
 #include <format>
+#include <system_error>
 
-template <typename Predicate>
-static const AudioDevice* findDevice(const std::vector<AudioDevice>& a_devices,
-                                     Predicate a_matches)
+// Caps display length and replaces control characters and bytes outside the
+// printable-ASCII range so a hostile or oddly-named device cannot inject
+// terminal escape sequences into stderr output. Multi-byte UTF-8 names lose
+// fidelity here; that tradeoff is intentional.
+static std::string cfToDisplay(CFStringRef a_cfstr)
 {
-  auto it = std::ranges::find_if(a_devices, a_matches);
-  if (it == a_devices.end())
-    return nullptr;
-  return &*it;
-}
-
-static std::string cfToString(CFStringRef a_cfstr)
-{
-  if (!a_cfstr)
-    return {};
-  CFIndex len = CFStringGetLength(a_cfstr);
-  CFIndex buf_size = 0;
-  CFStringGetBytes(a_cfstr, CFRangeMake(0, len), kCFStringEncodingUTF8, '?',
-                   false, nullptr, 0, &buf_size);
-  std::string result(static_cast<size_t>(buf_size), '\0');
-  CFStringGetBytes(a_cfstr, CFRangeMake(0, len), kCFStringEncodingUTF8, '?',
-                   false, reinterpret_cast<UInt8*>(result.data()), buf_size,
-                   nullptr);
+  constexpr size_t k_max_device_name_len = 256;
+  std::string result = cfToString(a_cfstr);
+  if (result.size() > k_max_device_name_len)
+    result.resize(k_max_device_name_len);
   for (char& c : result)
   {
     auto uc = static_cast<unsigned char>(c);
     if (uc < 0x20 || uc > 0x7E)
       c = '_';
   }
-  constexpr size_t k_max_device_name_len = 256;
-  if (result.size() > k_max_device_name_len)
-    result.resize(k_max_device_name_len);
   return result;
 }
 
@@ -74,7 +61,6 @@ std::vector<AudioDevice> getInputDevices()
 
   for (auto dev_id : ids)
   {
-    // Check input channel count
     prop = {kAudioDevicePropertyStreamConfiguration,
             kAudioDevicePropertyScopeInput, kAudioObjectPropertyElementMain};
     if (AudioObjectGetPropertyDataSize(dev_id, &prop, 0, nullptr, &size) !=
@@ -97,7 +83,6 @@ std::vector<AudioDevice> getInputDevices()
     dev.id = dev_id;
     dev.input_channels = in_ch;
 
-    // Name
     CFStringRef cf_name = nullptr;
     prop = {kAudioDevicePropertyDeviceNameCFString,
             kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
@@ -106,11 +91,11 @@ std::vector<AudioDevice> getInputDevices()
                                    &cf_name) == noErr &&
         cf_name)
     {
-      dev.name = cfToString(cf_name);
+      dev.name = cfToDisplay(cf_name);
       CFRelease(cf_name);
     }
 
-    // UID (persistent across reboots)
+    // UID is persistent across reboots; usable as a stable CLI selector.
     CFStringRef cf_uid = nullptr;
     prop = {kAudioDevicePropertyDeviceUID, kAudioObjectPropertyScopeGlobal,
             kAudioObjectPropertyElementMain};
@@ -119,11 +104,10 @@ std::vector<AudioDevice> getInputDevices()
             noErr &&
         cf_uid)
     {
-      dev.uid = cfToString(cf_uid);
+      dev.uid = cfToDisplay(cf_uid);
       CFRelease(cf_uid);
     }
 
-    // Sample rate
     prop = {kAudioDevicePropertyNominalSampleRate,
             kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
     size = sizeof(dev.sample_rate);
@@ -145,6 +129,9 @@ void printDeviceList(const std::vector<AudioDevice>& a_devices)
     return;
   }
   printErr("Input devices:\n");
+  // TODO: replace with std::views::enumerate (C++23, P2164) once libc++ ships
+  // it, or pull in a stand-in from an alternate ranges library tracking the
+  // std.
   for (size_t i = 0; i < a_devices.size(); i++)
   {
     auto& d = a_devices[i];
@@ -164,36 +151,37 @@ std::expected<AudioDevice, std::string> resolveSelectedDevice(
       return std::unexpected(
           std::string("Error: no default input device found.\n"));
 
-    const auto* device = findDevice(
+    auto it = std::ranges::find_if(
         a_devices,
         [default_id](const AudioDevice& d) { return d.id == default_id; });
-    if (!device)
+    if (it == a_devices.end())
       return std::unexpected(
           std::string("Error: default input device not available.\n"));
-    return *device;
+    return *it;
   }
 
   const std::string& selector = *a_selector;
-  // Try numeric index first (1-based)
-  char* end = nullptr;
-  long idx = strtol(selector.c_str(), &end, 10);
-  if (end != selector.c_str() && *end == '\0' && idx >= 1 &&
-      idx <= static_cast<long>(a_devices.size()))
-  {
-    return a_devices[static_cast<size_t>(idx - 1)];
-  }
 
-  // Then match UID
-  if (const auto* device = findDevice(
-          a_devices,
-          [&selector](const AudioDevice& d) { return d.uid == selector; }))
-    return *device;
+  // 1-based index has priority so a name that happens to be all-digits never
+  // shadows the index form printed by --list-devices.
+  size_t idx = 0;
+  const char* sel_end = selector.data() + selector.size();
+  auto [ptr, status] = std::from_chars(selector.data(), sel_end, idx);
+  if (status == std::errc {} && ptr == sel_end && idx >= 1 &&
+      idx <= a_devices.size())
+    return a_devices[idx - 1];
 
-  // Then match name
-  if (const auto* device = findDevice(
+  if (auto it = std::ranges::find_if(
           a_devices,
-          [&selector](const AudioDevice& d) { return d.name == selector; }))
-    return *device;
+          [&selector](const AudioDevice& d) { return d.uid == selector; });
+      it != a_devices.end())
+    return *it;
+
+  if (auto it = std::ranges::find_if(
+          a_devices,
+          [&selector](const AudioDevice& d) { return d.name == selector; });
+      it != a_devices.end())
+    return *it;
 
   return std::unexpected(
       std::format("Error: no input device matches '{}'.\n"

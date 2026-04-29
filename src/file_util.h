@@ -8,6 +8,7 @@
 
 uint64_t getFreeBytes(const std::string& a_path);
 
+std::expected<void, std::string> fullFsync(int a_fd, const std::string& a_path);
 std::expected<std::string, std::string> expandHome(const std::string& a_path);
 std::string defaultOutputPath();
 std::expected<std::string, std::string> resolveOutputPath(

@@ -3,9 +3,13 @@
 #include "file_util.h"
 #include "util.h"
 
+#include <fcntl.h>
+
+#include <cerrno>
 #include <chrono>
 #include <climits>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <format>
 
@@ -16,6 +20,16 @@ uint64_t getFreeBytes(const std::string& a_path)
   if (ec)
     return UINT64_MAX;
   return info.available;
+}
+
+// F_FULLFSYNC commits to platter on macOS; plain fsync only flushes OS buffers.
+std::expected<void, std::string> fullFsync(int a_fd, const std::string& a_path)
+{
+  if (fcntl(a_fd, F_FULLFSYNC) == -1)
+    return std::unexpected(
+        std::format("Error: F_FULLFSYNC of '{}' failed (errno {}: {}).\n",
+                    a_path, errno, std::strerror(errno)));
+  return {};
 }
 
 std::expected<std::string, std::string> expandHome(const std::string& a_path)

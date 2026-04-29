@@ -21,8 +21,8 @@ static std::expected<int, std::string> parsePositiveMinutes(
   const char* begin = a_optarg;
   const char* end = begin + std::strlen(begin);
   int val = 0;
-  auto [ptr, ec] = std::from_chars(begin, end, val);
-  if (ec != std::errc {} || ptr != end || val <= 0)
+  auto [ptr, status] = std::from_chars(begin, end, val);
+  if (status != std::errc {} || ptr != end || val <= 0)
   {
     return std::unexpected(std::format(
         "Error: invalid {} '{}'. Expected a positive integer (minutes).\n",
